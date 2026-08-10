@@ -27,6 +27,7 @@ from metrics.prometheus_metrics import (
     WORKERS_UNHEALTHY,
 )
 from orchestrator.redis_client import get_redis_client
+from monitoring.websocket_manager import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -43,37 +44,39 @@ class WorkerRegistry:
     HEARTBEAT_TIMEOUT = 60  # seconds
     SYNC_CHANNEL = "worker_registry_sync"
 
-    def __init__(self):
-        """Initialize worker registry"""
-        try:
-            self.redis_client = self._create_redis_client()
-            self.local_workers: dict[str, dict[str, Any]] = {}
-            self.lock = Lock()
-            self._hydrated = False
-            self._hydrate_from_redis()
+def __init__(self):
+    """Initialize worker registry"""
+    try:
+        self.redis_client = self._create_redis_client()
+        self.local_workers: dict[str, dict[str, Any]] = {}
+        self.lock = Lock()
+        self._hydrated = False
+        self._hydrate_from_redis()
 
-            # Keep a strong reference to background tasks to prevent garbage collection
-            self.background_tasks: set[asyncio.Task[Any]] = set()
+        # Keep a strong reference to background tasks to prevent garbage collection
+        self.background_tasks: set[asyncio.Task[Any]] = set()
 
-            # Start background listener for real-time synchronization
-            if self.redis_client:
-                try:
-                    loop = asyncio.get_running_loop()
-                    task = loop.create_task(self._start_pubsub_listener())
-                    self.background_tasks.add(task)
-                    task.add_done_callback(self.background_tasks.discard)
-                    logger.info("Worker Registry initialized with Pub/Sub Sync")
-                except RuntimeError:
-                    # No running event loop (pytest/unit tests)
-                    logger.debug(
-                        "Skipping Pub/Sub listener because no event loop is running"
-                    )
-            else:
-                logger.warning("Worker Registry initialized WITHOUT Redis connection")
+        # Start background listener for real-time synchronization
+        if self.redis_client:
+            try:
+                loop = asyncio.get_running_loop()
+                task = loop.create_task(self._start_pubsub_listener())
+                self.background_tasks.add(task)
+                task.add_done_callback(self.background_tasks.discard)
+                logger.info("Worker Registry initialized with Pub/Sub Sync")
+            except RuntimeError:
+                # No running event loop (pytest/unit tests)
+                logger.debug(
+                    "Skipping Pub/Sub listener because no event loop is running"
+                )
+        else:
+            logger.warning(
+                "Worker Registry initialized WITHOUT Redis connection"
+            )
 
-        except Exception as e:
-            logger.error(f"Error initializing Worker Registry: {e!s}")
-            self.redis_client = None
+    except Exception as e:
+        logger.error(f"Error initializing Worker Registry: {e!s}")
+        self.redis_client = None
 
     def _create_redis_client(self) -> Any:
         """Create the shared Redis client used by the orchestrator."""
@@ -367,6 +370,13 @@ class WorkerRegistry:
 
                 if has_changed:
                     self._trigger_sync_broadcast(worker_id)
+                    asyncio.create_task(
+                        ws_manager.broadcast_worker_alert(
+                            worker_id,
+                            "status_change",
+                            f"Worker {worker_id} status changed to healthy with {active_tasks} active tasks",
+                        )
+                    )
 
             logger.debug(f"Heartbeat from {worker_id}: {active_tasks} active tasks")
 
@@ -386,7 +396,6 @@ class WorkerRegistry:
             )
 
             return True
-
         except Exception as e:
             logger.error(f"Error processing heartbeat: {e!s}")
             return False
@@ -601,8 +610,18 @@ class WorkerRegistry:
                 if last_hb.tzinfo is None:
                     last_hb = last_hb.replace(tzinfo=timezone.utc)
                 if last_hb < timeout_threshold:
-                    unhealthy.append(worker_id)
-                    worker["status"] = "unhealthy"
+                        unhealthy.append(worker_id)
+
+                        if worker.get("status") != "unhealthy":
+                            worker["status"] = "unhealthy"
+                            asyncio.create_task(
+                                ws_manager.broadcast_worker_alert(
+                                    worker_id,
+                                    "unhealthy",
+                                    f"Worker {worker_id} is unhealthy",
+                                )
+                            )
+
 
         # Broadcast if status changes to unhealthy
         for wid in unhealthy:

@@ -1,7 +1,8 @@
 "use client";
 import { useAppStore } from "@/lib/store";
 import { useThemeStore } from "@/lib/theme";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import toast from "react-hot-toast";
 import {
   LogIn,
   LogOut,
@@ -49,10 +50,33 @@ function Topbar() {
     };
   }, []);
 
-  const { connected } = useWebSocket({
-    path: "/monitoring/ws/metrics",
-    enabled: !!token,
-  });
+  const handleWebSocketMessage = useCallback((data) => {
+  if (data.type === "session_update" && data.status === "completed") {
+    const candidateName =
+      data.details?.candidate_name ||
+      data.details?.candidateName ||
+      "Candidate";
+
+    toast.success(`Interview for ${candidateName} completed`);
+  }
+
+  if (
+    data.type === "worker_alert" &&
+    (data.alert_type === "unhealthy" ||
+      data.alert_type === "worker_down" ||
+      data.message?.toLowerCase().includes("unhealthy"))
+  ) {
+    toast.error(
+      data.message || `Worker ${data.worker_id} is unhealthy`
+    );
+  }
+}, []);
+
+const { connected } = useWebSocket({
+  path: "/monitoring/ws/metrics",
+  onMessage: handleWebSocketMessage,
+  enabled: !!token,
+});
 
   const ThemeIcon =
     theme === "dark" ? Moon : theme === "light" ? Sun : Monitor;
@@ -60,6 +84,8 @@ function Topbar() {
     theme === "dark" ? "Dark" : theme === "light" ? "Light" : "System";
 
   return (
+    <>
+  
     <header className="flex h-14 items-center justify-between border-b border-border bg-bg-panel px-4 md:px-5">
       {/* Left: mobile menu + command palette trigger */}
       <div className="flex items-center gap-3">
@@ -195,6 +221,7 @@ function Topbar() {
         )}
       </div>
     </header>
+    </>
   );
 }
 
