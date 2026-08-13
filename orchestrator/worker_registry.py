@@ -44,6 +44,7 @@ class WorkerRegistry:
     HEARTBEAT_TIMEOUT = 60  # seconds
     SYNC_CHANNEL = "worker_registry_sync"
 
+
 def __init__(self):
     """Initialize worker registry"""
     try:
@@ -70,9 +71,7 @@ def __init__(self):
                     "Skipping Pub/Sub listener because no event loop is running"
                 )
         else:
-            logger.warning(
-                "Worker Registry initialized WITHOUT Redis connection"
-            )
+            logger.warning("Worker Registry initialized WITHOUT Redis connection")
 
     except Exception as e:
         logger.error(f"Error initializing Worker Registry: {e!s}")
@@ -610,18 +609,17 @@ def __init__(self):
                 if last_hb.tzinfo is None:
                     last_hb = last_hb.replace(tzinfo=timezone.utc)
                 if last_hb < timeout_threshold:
-                        unhealthy.append(worker_id)
+                    unhealthy.append(worker_id)
 
-                        if worker.get("status") != "unhealthy":
-                            worker["status"] = "unhealthy"
-                            asyncio.create_task(
-                                ws_manager.broadcast_worker_alert(
-                                    worker_id,
-                                    "unhealthy",
-                                    f"Worker {worker_id} is unhealthy",
-                                )
+                    if worker.get("status") != "unhealthy":
+                        worker["status"] = "unhealthy"
+                        asyncio.create_task(
+                            ws_manager.broadcast_worker_alert(
+                                worker_id,
+                                "unhealthy",
+                                f"Worker {worker_id} is unhealthy",
                             )
-
+                        )
 
         # Broadcast if status changes to unhealthy
         for wid in unhealthy:

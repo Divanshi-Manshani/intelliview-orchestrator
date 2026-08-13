@@ -352,11 +352,11 @@ class SessionManager:
                     session_data["updated_at"] = _utcnow().isoformat()
                     self.state_sync.set_session_state(session_id, session_data)
                     self._broadcast_status(
-    session_id,
-    self.COMPLETED,
-    risk_score,
-    {},
-)
+                        session_id,
+                        self.COMPLETED,
+                        risk_score,
+                        {},
+                    )
 
             logger.info(f"Session {session_id} marked as completed")
             return True
