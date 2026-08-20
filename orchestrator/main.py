@@ -1333,9 +1333,7 @@ async def clear_session_cache(
 
         audit_logger.log_admin_action(
             action="clear-cache",
-            actor=current_user.get("email")
-            or current_user.get("user_id")
-            or "admin",
+            actor=current_user.get("email") or current_user.get("user_id") or "admin",
             details={"success": bool(result)},
         )
 
