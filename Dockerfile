@@ -46,10 +46,9 @@ COPY requirements.txt /app/requirements.txt
 # ---------------------------------------------------------
 # Install PyTorch CPU version
 # ---------------------------------------------------------
-RUN pip install --no-cache-dir \
-    torch \
-    --index-url https://download.pytorch.org/whl/cpu
-
+# Install PyTorch CPU version from local wheel
+COPY torch-2.13.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl /tmp/torch-2.13.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl
+RUN pip install --no-cache-dir /tmp/torch-2.13.0+cpu-cp311-cp311-manylinux_2_28_x86_64.whl
 # ---------------------------------------------------------
 # Install Python dependencies
 # ---------------------------------------------------------
