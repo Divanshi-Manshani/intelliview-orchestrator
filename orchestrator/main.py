@@ -1266,8 +1266,11 @@ async def get_cache_stats():
         raise HTTPException(status_code=500, detail="Error fetching cache stats")
 
 
-@app.post("/sync-to-database", dependencies=[Depends(require_token)])
-async def sync_cache_to_database(session_id: str | None = None):
+@app.post("/sync-to-database")
+async def sync_cache_to_database(
+    session_id: str | None = None,
+    current_user=Depends(require_role("admin")),
+):
     """
     Manually sync cache to database
 
@@ -1285,7 +1288,9 @@ async def sync_cache_to_database(session_id: str | None = None):
 
                 audit_logger.log_admin_action(
                     action="sync-to-database",
-                    actor="admin",
+                    actor=current_user.get("email")
+                    or current_user.get("user_id")
+                    or "admin",
                     details={"session_id": session_id},
                 )
                 return {"message": f"Synced session {session_id}", "status": "success"}
@@ -1299,7 +1304,7 @@ async def sync_cache_to_database(session_id: str | None = None):
 
         audit_logger.log_admin_action(
             action="sync-to-database",
-            actor="admin",
+            actor=current_user.get("email") or current_user.get("user_id") or "admin",
             details={"synced_count": len(active_sessions)},
         )
 

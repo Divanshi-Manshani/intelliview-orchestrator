@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, patch
 
+from orchestrator.audit_logger import AuditLogger
+
 with (
     patch("redis.from_url", return_value=MagicMock()),
     patch("sqlalchemy.create_engine", return_value=MagicMock()),
@@ -57,6 +59,87 @@ def test_sync_to_database_with_token():
     )
 
     assert response.status_code == 200
+
+
+def test_admin_audit_events_contain_actor_action_and_timestamp():
+    audit_logger = AuditLogger()
+
+    audit_logger.log_admin_action(
+        action="clear-cache",
+        actor="admin@example.com",
+    )
+    audit_logger.log_admin_action(
+        action="sync-to-database",
+        actor="admin@example.com",
+        details={"session_id": "session-123"},
+    )
+
+    events = audit_logger.get_recent_events(limit=2)
+
+    assert len(events) == 2
+
+    clear_cache_event = events[1]
+    sync_event = events[0]
+
+    assert clear_cache_event["actor"] == "admin@example.com"
+    assert clear_cache_event["target"] == "clear-cache"
+    assert clear_cache_event["event_type"] == "ADMIN_ACTION"
+    assert clear_cache_event["timestamp"]
+
+    assert sync_event["actor"] == "admin@example.com"
+    assert sync_event["target"] == "sync-to-database"
+    assert sync_event["event_type"] == "ADMIN_ACTION"
+    assert sync_event["timestamp"]
+
+
+def test_sync_to_database_audit_uses_authenticated_actor():
+    from orchestrator.security import get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: {
+        "role": "admin",
+        "user_id": "admin-123",
+        "email": "admin@example.com",
+    }
+
+    try:
+        with patch(
+            "orchestrator.main.audit_logger.log_admin_action"
+        ) as mock_log_admin_action:
+            with patch(
+                "orchestrator.main.state_sync.get_active_sessions",
+                return_value=[],
+            ):
+                response = client.post("/sync-to-database")
+
+        assert response.status_code == 200
+
+        mock_log_admin_action.assert_called_once()
+
+        call = mock_log_admin_action.call_args.kwargs
+
+        assert call["action"] == "sync-to-database"
+        assert call["actor"] == "admin@example.com"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@patch("orchestrator.main.audit_logger.log_admin_action")
+@patch("orchestrator.main.state_sync.get_active_sessions", return_value=[])
+def test_sync_to_database_audit_uses_authenticated_actor(
+    mock_get_active_sessions,
+    mock_log_admin_action,
+):
+    response = client.post(
+        "/sync-to-database",
+        headers={"X-API-Token": "ci-test-token"},
+    )
+
+    assert response.status_code == 200
+    mock_log_admin_action.assert_called_once()
+
+    call = mock_log_admin_action.call_args.kwargs
+    assert call["action"] == "sync-to-database"
+    assert call["actor"] == "admin"
 
 
 @patch("orchestrator.http_cache.invalidate")
