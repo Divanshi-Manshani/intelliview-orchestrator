@@ -49,7 +49,7 @@ def test_sync_to_database_without_token():
     response = client.post("/sync-to-database")
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "invalid or missing API token"
+    assert response.json()["detail"] == "Invalid or missing authentication"
 
 
 def test_sync_to_database_with_token():
