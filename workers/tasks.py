@@ -29,6 +29,7 @@ from monitoring.prometheus_metrics import (
     CELERY_TASKS_PROCESSED_TOTAL,
     FAILURE_COUNT,
     PIPELINE_LATENCY,
+    AVG_EVALUATION_LATENCY,
     POSTGRES_HEALTH,
     QUEUE_DEPTH,
     REDIS_HEALTH,
@@ -139,12 +140,14 @@ def _run_audio(self, session_id: str) -> dict:
 )
 def _after_parallel(self, session_id: str, video_result: dict, audio_result: dict):
     """Runs after video + audio group completes; then evaluation + risk."""
+    global evaluation_latency_total, evaluation_latency_count
     try:
         logger.info("Parallel video+audio done for %s - running evaluation", session_id)
         session_manager.update_session_status(session_id, session_manager.EVALUATING, {"stage": "evaluation"})
 
         start = time.perf_counter()
         evaluation_result = evaluate_answers(session_id)
+        evaluation_completed_at = datetime.now(timezone.utc)
 
         latency = time.perf_counter() - start
         PIPELINE_LATENCY.labels(stage="evaluation").observe(latency)
@@ -166,6 +169,15 @@ def _after_parallel(self, session_id: str, video_result: dict, audio_result: dic
                 select(InterviewSession).where(InterviewSession.session_id == session_id)
             ).scalar_one_or_none()
             if interview:
+                evaluation_latency = (
+                    evaluation_completed_at - interview.start_time
+                ).total_seconds()
+
+                evaluation_latency_total += evaluation_latency
+                evaluation_latency_count += 1
+                AVG_EVALUATION_LATENCY.set(
+                    evaluation_latency_total / evaluation_latency_count
+                )
                 interview.risk_score = final_risk_score
                 interview.video_analysis = video_result
                 interview.audio_analysis = audio_result
