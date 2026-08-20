@@ -35,6 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
+from orchestrator.audit_logger import audit_logger
 
 from config import (
     API_TOKEN,
@@ -1281,6 +1282,12 @@ async def sync_cache_to_database(session_id: str | None = None):
             session_data = state_sync.get_session_state(session_id)
             if session_data:
                 state_sync.sync_state_to_db(session_id, session_data)
+
+                audit_logger.log_admin_action(
+                    action="sync-to-database",
+                    actor="admin",
+                    details={"session_id": session_id},
+                )
                 return {"message": f"Synced session {session_id}", "status": "success"}
             raise HTTPException(status_code=404, detail="Session not found in cache")
         # Sync all active sessions
@@ -1289,6 +1296,12 @@ async def sync_cache_to_database(session_id: str | None = None):
             session_data = state_sync.get_session_state(sid)
             if session_data:
                 state_sync.sync_state_to_db(sid, session_data)
+
+        audit_logger.log_admin_action(
+            action="sync-to-database",
+            actor="admin",
+            details={"synced_count": len(active_sessions)},
+        )
 
         return {
             "message": f"Synced {len(active_sessions)} sessions",
@@ -1302,8 +1315,10 @@ async def sync_cache_to_database(session_id: str | None = None):
         raise HTTPException(status_code=500, detail="Error syncing to database")
 
 
-@app.delete("/clear-cache", dependencies=[Depends(require_role("admin"))])
-async def clear_session_cache():
+@app.delete("/clear-cache")
+async def clear_session_cache(
+    current_user=Depends(require_role("admin")),
+):
     """
     Clear all session cache from Redis
 
@@ -1315,7 +1330,19 @@ async def clear_session_cache():
     try:
         logger.warning("Clearing all session cache from Redis")
         result = state_sync.clear_cache()
-        return {"message": "Cache cleared", "status": "success" if result else "failed"}
+
+        audit_logger.log_admin_action(
+            action="clear-cache",
+            actor=current_user.get("email")
+            or current_user.get("user_id")
+            or "admin",
+            details={"success": bool(result)},
+        )
+
+        return {
+            "message": "Cache cleared",
+            "status": "success" if result else "failed",
+        }
     except Exception as e:
         logger.error(f"Error clearing cache: {e!s}")
         raise HTTPException(status_code=500, detail="Error clearing cache")
