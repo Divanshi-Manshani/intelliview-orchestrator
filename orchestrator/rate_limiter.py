@@ -40,9 +40,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
     Each endpoint uses its own Redis bucket, so limits are independent.
     """
 
-    EXEMPT_PATHS: frozenset[str] = frozenset(
-        {"/health", "/docs", "/openapi.json"}
-    )
+    EXEMPT_PATHS: frozenset[str] = frozenset({"/health", "/docs", "/openapi.json"})
 
     def __init__(
         self,
@@ -70,11 +68,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         if path in self.endpoint_limits:
             return False
 
-        return (
-            path in self.EXEMPT_PATHS
-            or path.startswith("/docs")
-            or path == "/metrics/web-vitals"
-        )
+        return path in self.EXEMPT_PATHS or path.startswith("/docs") or path == "/metrics/web-vitals"
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
@@ -139,7 +133,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         ip = (
             forwarded.split(",")[0].strip()
             if forwarded
-            else request.client.host if request.client else "unknown"
+            else request.client.host
+            if request.client
+            else "unknown"
         )
 
         token = request.headers.get("x-api-token", "")
