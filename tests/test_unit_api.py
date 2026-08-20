@@ -123,25 +123,6 @@ def test_sync_to_database_audit_uses_authenticated_actor():
         app.dependency_overrides.pop(get_current_user, None)
 
 
-@patch("orchestrator.main.audit_logger.log_admin_action")
-@patch("orchestrator.main.state_sync.get_active_sessions", return_value=[])
-def test_sync_to_database_audit_uses_authenticated_actor(
-    mock_get_active_sessions,
-    mock_log_admin_action,
-):
-    response = client.post(
-        "/sync-to-database",
-        headers={"X-API-Token": "ci-test-token"},
-    )
-
-    assert response.status_code == 200
-    mock_log_admin_action.assert_called_once()
-
-    call = mock_log_admin_action.call_args.kwargs
-    assert call["action"] == "sync-to-database"
-    assert call["actor"] == "admin"
-
-
 @patch("orchestrator.http_cache.invalidate")
 @patch("orchestrator.main.scheduler.get_estimated_wait_time")
 @patch("orchestrator.main.scheduler.schedule_task")
