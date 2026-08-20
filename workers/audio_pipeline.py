@@ -17,7 +17,6 @@ HIGH/CRITICAL thresholds fire correctly without GPU dependencies.
 
 import logging
 import os
-import shutil
 import tempfile
 import time
 from pathlib import Path
@@ -128,27 +127,29 @@ def _get_audio_duration(audio_path: str, segments: list[dict[str, Any]]) -> floa
 
 def _real_transcribe(session_id: str, audio_url: str | None = None) -> dict[str, Any] | None:
     """Transcribe audio using local Whisper model."""
-    audio_path = session_id
+    
     vad_ran = False
     try:
         import numpy as np
 
         from workers.ai_client import transcribe_audio_file
 
-        detector = VoiceActivityDetector(cfg=vad_config)
-        vad_segments = detector.process_audio(session_id) or []
-        vad_ran = True
+        vad_ran = False
     except (ImportError, AttributeError, Exception) as exc:
         logger.debug("VAD skipped: %s", exc)
 
     try:
-        from workers.ai_client import transcribe_audio_file
-
         url = session_id or os.environ.get("AUDIO_STREAM_URL", "").strip()
         if not url and not vad_ran:
             logger.debug("Transcription skipped: no audio URL configured.")
             return None
         result = transcribe_audio_file(session_id)
+        if result is None:
+            logger.warning(
+                "transcribe_audio_file returned None for session %s",
+                session_id,
+            )
+            return None
         segments = result.get("segments", [])
         if segments:
             avg_logprob = np.mean([s.get("avg_logprob", -1.0) for s in segments])
@@ -158,6 +159,7 @@ def _real_transcribe(session_id: str, audio_url: str | None = None) -> dict[str,
                 3,
             )
         else:
+            avg_logprob = None
             confidence = 0.0
 
         logger.info(
@@ -198,8 +200,6 @@ def _real_transcribe(session_id: str, audio_url: str | None = None) -> dict[str,
 def _real_detect_background_voices(session_id: str, audio_url: str | None = None) -> BackgroundVoiceResult | None:
     """Detect background voices using pyannote speaker diarisation."""
     audio_path = session_id
-    import tempfile
-    import urllib.request
 
     try:
         from workers.ai_client import detect_speaker_segments
@@ -365,22 +365,7 @@ def transcribe_speech(session_id: str) -> dict[str, Any]:
         "timestamp": None,
     }
 
-    if vad_config is not None:
-        stub_res["vad_executed"] = True
-        stub_res["speech_detected"] = bool(text)
-        stub_res["vad_segments"] = []
-        
-        # Safely extract dict representation inline without needing extra functions
-        if isinstance(vad_config, dict):
-            stub_res["vad_config"] = vad_config
-        elif hasattr(vad_config, "to_dict"):
-            stub_res["vad_config"] = vad_config.to_dict()
-        elif hasattr(vad_config, "__dict__"):
-            stub_res["vad_config"] = vad_config.__dict__
-        else:
-            stub_res["vad_config"] = vad_config
-
-    return stub_res
+   
 
 def detect_background_voices(session_id: str) -> dict[str, Any]:
     """Detect background voices — real diarisation with seeded stub fallback."""

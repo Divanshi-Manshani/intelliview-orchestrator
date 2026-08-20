@@ -1,7 +1,7 @@
 "use client";
 import { useState, useMemo, lazy, Suspense, useCallback } from "react";
 import useSWR from "swr";
-import { Play, RefreshCcw, X } from "lucide-react";
+import { Play, RefreshCcw, X, Download } from "lucide-react";
 import Card from "@/components/Card";
 import { StatusBadge, Badge } from "@/components/Badge";
 import { Skeleton, ErrorState, EmptyState } from "@/components/States";
@@ -13,6 +13,7 @@ import { cn, formatDate, riskColor } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { exportSessionsCSV } from "@/lib/export";
 
 const SessionDetail = lazy(() => import("@/components/SessionDetail"));
 
@@ -93,6 +94,7 @@ function SessionComparison({ sessions, onClose }) {
 export default function SessionsPage() {
   const [tab, setTab] = useState("active");
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [openId, setOpenId] = useState(null);
   const [compareIds, setCompareIds] = useState([]);
   const token = useAppStore((s) => s.token);
@@ -100,6 +102,10 @@ export default function SessionsPage() {
   const active = useSWR("/active-sessions", { refreshInterval: 2000 });
   const completed = useSWR("/completed-sessions?limit=100", { refreshInterval: 10000 });
   const failed = useSWR("/failed-sessions?limit=100", { refreshInterval: 10000 });
+
+  // Fetch ALL sessions for export (no limit)
+  const allCompleted = useSWR("/completed-sessions?limit=10000", { refreshInterval: 30000 });
+  const allFailed = useSWR("/failed-sessions?limit=10000", { refreshInterval: 30000 });
 
   const data = tab === "active" ? active : tab === "completed" ? completed : failed;
 
@@ -129,6 +135,27 @@ export default function SessionsPage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(-4)
     );
   }, []);
+
+  const handleExportCSV = useCallback(() => {
+    // Combine ALL sessions from all sources for complete export
+    const allSessions = [
+      ...(active.data?.sessions ?? []),
+      ...(allCompleted.data?.sessions ?? []),
+      ...(allFailed.data?.sessions ?? []),
+    ];
+
+    if (allSessions.length === 0) {
+      toast.error("No data to export");
+      return;
+    }
+    
+    try {
+      exportSessionsCSV(allSessions);
+      toast.success("CSV exported successfully");
+    } catch (error) {
+      toast.error("Failed to export CSV");
+    }
+  }, [active.data?.sessions, allCompleted.data?.sessions, allFailed.data?.sessions]);
 
   const compareSessions = useMemo(
     () =>
@@ -174,6 +201,14 @@ export default function SessionsPage() {
               placeholder="Filter by id or candidate..."
               className="w-64"
             />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCSV}
+              icon={<Download size={12} />}
+            >
+              Export CSV
+            </Button>
             <Button
               variant="secondary"
               size="sm"
@@ -224,11 +259,15 @@ export default function SessionsPage() {
                       />
                     </Td>
                   )}
-                  <Td
-                    onClick={() => setOpenId(s.session_id)}
-                    className="cursor-pointer font-mono text-xs text-zinc-300 hover:text-accent-light transition-colors"
-                  >
-                    {s.session_id}
+                  <Td>
+                    <button
+                      type="button"
+                      data-testid={`session-row-${s.session_id}`}
+                      onClick={() => setOpenId(s.session_id)}
+                      className="cursor-pointer font-mono text-xs text-zinc-300 transition-colors hover:text-accent-light"
+                    >
+                      {s.session_id}
+                   </button>
                   </Td>
                   <Td>
                     <Pipeline current={s.status} />

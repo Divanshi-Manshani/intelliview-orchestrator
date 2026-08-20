@@ -5,10 +5,9 @@ import WebVitals from "@/components/WebVitals";
 import "./globals.css";
 import { jsx, jsxs } from "react/jsx-runtime";
 
-// Using a system-font stack instead of next/font/google("Inter") so the
-// production build never depends on reaching fonts.googleapis.com. That
-// remote fetch was making CI builds fail intermittently (NextFontError).
-const inter = { variable: "" };
+// Use system font stack instead of Google Fonts to avoid network dependency
+// This prevents NextFontError when fonts.googleapis.com is unreachable
+const fontClassName = "font-sans";
 
 const metadata = {
   title: "AI-Intelliview Orchestrator",
@@ -21,7 +20,7 @@ function RootLayout({ children }) {
     className: "dark",
     suppressHydrationWarning: true,
     children: /* @__PURE__ */ jsxs("body", {
-      className: inter.variable + " font-sans",
+      className: fontClassName,
       children: [
         /* Web Vitals Monitoring */
         /* @__PURE__ */ jsx(WebVitals, {}),

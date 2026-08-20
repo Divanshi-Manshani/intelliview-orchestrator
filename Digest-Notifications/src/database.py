@@ -20,7 +20,8 @@ def init_db():
     os.makedirs(DATA_DIR, exist_ok=True)
     conn = get_db_conn()
     cursor = conn.cursor()
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS interviews (
             id TEXT PRIMARY KEY,
             candidate_name TEXT NOT NULL,
@@ -32,8 +33,10 @@ def init_db():
             meeting_link TEXT,
             location TEXT
         )
-    """)
-    cursor.execute("""
+    """
+    )
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS sent_logs (
             id TEXT PRIMARY KEY,
             timestamp TEXT NOT NULL,
@@ -43,7 +46,8 @@ def init_db():
             recipient TEXT NOT NULL,
             status TEXT NOT NULL
         )
-    """)
+    """
+    )
     conn.commit()
 
     # Automatic migration helper if SQLite database table is empty and JSON files exist
@@ -51,7 +55,7 @@ def init_db():
     count_interviews = cursor.fetchone()[0]
     if count_interviews == 0 and os.path.exists(INTERVIEWS_FILE):
         try:
-            with open(INTERVIEWS_FILE, "r", encoding="utf-8") as f:
+            with open(INTERVIEWS_FILE, encoding="utf-8") as f:
                 interviews = json.load(f)
             for item in interviews:
                 cursor.execute(
@@ -76,7 +80,7 @@ def init_db():
     count_logs = cursor.fetchone()[0]
     if count_logs == 0 and os.path.exists(LOGS_FILE):
         try:
-            with open(LOGS_FILE, "r", encoding="utf-8") as f:
+            with open(LOGS_FILE, encoding="utf-8") as f:
                 logs = json.load(f)
             for item in logs:
                 cursor.execute(
