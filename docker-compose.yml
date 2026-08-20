@@ -23,7 +23,8 @@ services:
           cpus: "1.0"
 
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
+    platform: linux/amd64
     container_name: ai-interview-postgres
     ports:
       - "5432:5432"
@@ -100,7 +101,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
       API_URL: "http://fastapi:8000"
-      API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
+      API_TOKEN: ${API_TOKEN}
       WORKER_CONCURRENCY: "4"
       WORKER_ID: "${WORKER_ID:-worker-1}"
       CV_SERVICE_URL: "http://cv-service:8001"
@@ -247,7 +248,7 @@ services:
       - ai-interview-network
  
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:14269/"]
       interval: 15s
       timeout: 5s
       start_period: 30s
@@ -267,6 +268,7 @@ services:
     ports:
       - "3000:3000"
     environment:
+      HOSTNAME: "0.0.0.0"
       NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://localhost:8000}"
     depends_on:
       fastapi:
@@ -291,7 +293,7 @@ services:
       dockerfile: Dockerfile
     container_name: ai-interview-digest-notifications
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       API_TOKEN: "${API_TOKEN:-dev-token-change-me}"
       DIGEST_BATCH_SIZE: "5"
@@ -302,6 +304,12 @@ services:
     working_dir: /app/Digest-Notifications
     command: python src/digest.py --serve --port 8080 --host 0.0.0.0
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     deploy:
       resources:
         limits:

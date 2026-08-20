@@ -62,6 +62,7 @@ from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.store import DEFAULT_WEIGHTS
 from orchestrator.worker_registry import WorkerRegistry
+from workers.ab_testing_framework import ABTestingFramework
 from routers.admin import create_admin_routes
 from routers.candidates import create_candidate_routes
 from routers.health import create_health_routes
@@ -73,6 +74,7 @@ from routers.sessions import (  # noqa: F401 (re-exported for tests)
 )
 from routers.templates import create_template_routes
 from routers.workers import create_worker_routes
+from routers.ab_testing import create_ab_testing_routes
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()
@@ -284,6 +286,10 @@ candidate_manager = CandidateManager()
 interview_template_manager = InterviewTemplateManager()
 notification_manager = NotificationManager()
 
+ab_testing_framework = ABTestingFramework(
+    experiment_id="risk-scoring-v1"
+)
+
 # Register dashboard routes
 dashboard_routes = create_dashboard_routes(
     metrics_collector=metrics_collector,
@@ -336,6 +342,12 @@ app.include_router(
 app.include_router(risk_configs_router)
 
 app.include_router(metrics_router)
+
+app.include_router(
+    create_ab_testing_routes(
+        ab_testing_framework=ab_testing_framework,
+    )
+)
 
 
 @app.get("/risk-engine/weights/{role}")

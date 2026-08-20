@@ -37,4 +37,4 @@ COPY --from=builder --chown=app:app /app/.next/static ./.next/static
 USER app
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+CMD ["node", "server.js", "-H", "0.0.0.0"]
