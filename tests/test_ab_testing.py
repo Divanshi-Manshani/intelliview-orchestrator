@@ -154,7 +154,7 @@ def test_framework_is_modular():
 
     assert framework.production_model is not None
     assert framework.experimental_model is not None
-    
+
 
 def test_get_experiment_data_with_no_results():
 
@@ -201,16 +201,10 @@ def test_get_experiment_data_with_multiple_variants():
 
     assert len(result) == 2
 
-    weighted = next(
-        item
-        for item in result
-        if item["variant"] == "weighted_model"
-    )
+    weighted = next(item for item in result if item["variant"] == "weighted_model")
 
     experimental = next(
-        item
-        for item in result
-        if item["variant"] == "experimental_model"
+        item for item in result if item["variant"] == "experimental_model"
     )
 
     assert weighted == {

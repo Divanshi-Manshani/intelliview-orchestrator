@@ -388,9 +388,7 @@ question_bank = QuestionBank()
 candidate_manager = CandidateManager()
 interview_template_manager = InterviewTemplateManager()
 
-ab_testing_framework = ABTestingFramework(
-    experiment_id="risk-scoring-v1"
-)
+ab_testing_framework = ABTestingFramework(experiment_id="risk-scoring-v1")
 
 # Register dashboard routes
 dashboard_routes = create_dashboard_routes(

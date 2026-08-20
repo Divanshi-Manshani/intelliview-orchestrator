@@ -147,9 +147,7 @@ class ABTestingFramework:
                     "experiment_id": data["experiment_id"],
                     "variant": data["variant"],
                     "sessions": len(data["sessions"]),
-                    "avg_score": round(sum(scores) / len(scores), 3)
-                    if scores
-                    else 0.0,
+                    "avg_score": round(sum(scores) / len(scores), 3) if scores else 0.0,
                 }
             )
 
