@@ -6,7 +6,6 @@ It intentionally does not contain LLM clients, API wrappers, or
 prompt-execution logic.
 """
 
-
 # ---------------------------------------------------------------------------
 # Evaluation Prompts
 # ---------------------------------------------------------------------------
