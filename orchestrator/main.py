@@ -86,13 +86,7 @@ from orchestrator.session_manager import SessionManager
 from orchestrator.session_tracker import SessionTracker
 from orchestrator.state_sync import StateSynchronizer
 from orchestrator.worker_registry import WorkerRegistry
-
-
-from workers.ab_testing_framework import ABTestingFramework
-from routers.admin import create_admin_routes
 from routers.ab_testing import create_ab_testing_routes
-from workers.bias_auditor import BiasAuditor
-
 from routers.candidates import create_candidate_routes
 from routers.questions import create_question_routes
 from routers.schedule import create_schedule_routes
@@ -103,6 +97,8 @@ from routers.sessions import (  # noqa: F401 (re-exported for tests)
 from routers.settings import create_settings_routes
 from routers.templates import create_template_routes
 from routers.workers import create_worker_routes
+from workers.ab_testing_framework import ABTestingFramework
+from workers.bias_auditor import BiasAuditor
 
 # Configure logging after imports so startup messages are structured.
 configure_logging()

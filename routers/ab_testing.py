@@ -1,7 +1,6 @@
 """A/B testing dashboard routes."""
 
 from fastapi import APIRouter
-import routers
 
 
 def create_ab_testing_routes(ab_testing_framework) -> APIRouter:
