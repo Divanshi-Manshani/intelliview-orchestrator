@@ -2,8 +2,10 @@
 Simple Redis-backed rate limiter middleware for FastAPI.
 
 Uses a sliding-window counter stored in Redis.  Each unique client
-(IP + optional API key) gets a separate counter.  When the limit is
-exceeded the middleware returns 429 Too Many Requests.
+(IP + optional API key) gets a separate counter, scoped per endpoint
+so that different routes can have independent, differently-configured
+limits (e.g. stricter on /login, looser on /health).  When the limit
+is exceeded the middleware returns 429 Too Many Requests.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -22,27 +25,53 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_LIMIT = 60  # requests per window
 _DEFAULT_WINDOW_SECONDS = 60  # 1 minute window
+ 
+@dataclass(frozen=True)
+class RouteLimit:
+    """A rate limit configuration for one endpoint."""
+
+    limit: int
+    window_seconds: int
+
+
+# Per-endpoint overrides. Keys are exact request paths.
+# Anything not listed here falls back to (_DEFAULT_LIMIT, _DEFAULT_WINDOW_SECONDS).
+DEFAULT_ROUTE_LIMITS: dict[str, RouteLimit] = {
+    "/login": RouteLimit(limit=5, window_seconds=60),
+}
 
 
 class RateLimiterMiddleware(BaseHTTPMiddleware):
-    """Per-client sliding-window rate limiter backed by Redis.
+    """Per-client, per-endpoint sliding-window rate limiter backed by Redis.
 
-    The key is derived from the client IP and the ``X-API-Token``
-    header (if present).  Paths under ``/health`` and ``/docs`` are
-    exempt from limiting.
+    The key is derived from the client IP, the ``X-API-Token`` header
+    (if present), and the request path — so each endpoint tracks its
+    own independent window. Paths under ``/docs`` are exempt from
+    limiting entirely.
     """
 
-    EXEMPT_PATHS: frozenset[str] = frozenset({"/health", "/docs", "/openapi.json"})
+    EXEMPT_PATHS: frozenset[str] = frozenset({
+    "/health",
+    "/docs",
+    "/openapi.json",})
 
     def __init__(
         self,
         app,
         limit: int = _DEFAULT_LIMIT,
         window_seconds: int = _DEFAULT_WINDOW_SECONDS,
+        route_limits: dict[str, RouteLimit] | None = None,
     ) -> None:
         super().__init__(app)
-        self.limit = limit
-        self.window_seconds = window_seconds
+        # Fallback used for any path not present in route_limits.
+        self.default_limit = RouteLimit(limit=limit, window_seconds=window_seconds)
+        self.route_limits: dict[str, RouteLimit] = (
+            route_limits if route_limits is not None else dict(DEFAULT_ROUTE_LIMITS)
+        )
+
+    def _limit_for_path(self, path: str) -> RouteLimit:
+        """Return the configured RouteLimit for a given path, or the default."""
+        return self.route_limits.get(path, self.default_limit)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         path = request.url.path
@@ -53,6 +82,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
+        route_limit = self._limit_for_path(path)
         client_key = self._client_key(request)
         redis_client = CacheManager()
 
@@ -61,8 +91,10 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 
         try:
             now = time.time()
-            window_start = now - self.window_seconds
-            redis_key = f"ratelimit:{client_key}"
+            window_start = now - route_limit.window_seconds
+            # Path is part of the key so each endpoint has its own
+            # independent counter/window.
+            redis_key = f"ratelimit:{path}:{client_key}"
 
             pipe = redis_client.raw.pipeline(transaction=False)
             # Remove entries outside the window
@@ -72,13 +104,13 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             # Count requests in window
             pipe.zcard(redis_key)
             # Set TTL so old keys are cleaned up automatically
-            pipe.expire(redis_key, self.window_seconds * 2)
+            pipe.expire(redis_key, route_limit.window_seconds * 2)
             results = pipe.execute()
 
             request_count = results[2]
 
-            if request_count > self.limit:
-                retry_after = int(self.window_seconds - (now - window_start))
+            if request_count > route_limit.limit:
+                retry_after = int(route_limit.window_seconds - (now - window_start))
                 return JSONResponse(
                     status_code=429,
                     content={
