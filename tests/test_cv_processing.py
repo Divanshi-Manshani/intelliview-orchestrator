@@ -1,6 +1,7 @@
 from cv_service.processing import detect_faces_in_frame
 from cv_service import processing
 
+
 def test_garbled_frame_is_handled_and_logged(caplog, monkeypatch):
     monkeypatch.setattr(processing, "HAS_MEDIAPIPE", True)
     with caplog.at_level("WARNING"):
