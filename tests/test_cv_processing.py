@@ -1,5 +1,5 @@
 from cv_service.processing import detect_faces_in_frame
-
+from cv_service import processing
 
 def test_garbled_frame_is_handled_and_logged(caplog):
     with caplog.at_level("WARNING"):
@@ -30,18 +30,13 @@ def test_processing_exception_is_handled_and_logged(caplog, monkeypatch):
 
     image = np.zeros((480, 640, 3), dtype=np.uint8)
 
-    monkeypatch.setattr(
-        "cv_service.processing.cv2.imread",
-        lambda _: image,
-    )
-
+   monkeypatch.setattr(
+    processing.cv2,
+    "imread",
+    lambda _: image,
+)
     def raise_processing_error(*args, **kwargs):
         raise RuntimeError("simulated OpenCV processing failure")
-
-    monkeypatch.setattr(
-        "cv_service.processing.cv2.cvtColor",
-        raise_processing_error,
-    )
 
     with caplog.at_level("WARNING"):
         result = detect_faces_in_frame(frame_path="/tmp/test-frame.jpg")
