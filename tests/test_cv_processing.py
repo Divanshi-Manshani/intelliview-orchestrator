@@ -23,9 +23,7 @@ def test_missing_frame_is_handled_and_logged(caplog, monkeypatch):
 def test_invalid_file_path_is_handled_and_logged(caplog, monkeypatch):
     monkeypatch.setattr(processing, "HAS_MEDIAPIPE", True)
     with caplog.at_level("WARNING"):
-        result = detect_faces_in_frame(
-            frame_path="/tmp/this-file-does-not-exist.jpg"
-        )
+        result = detect_faces_in_frame(frame_path="/tmp/this-file-does-not-exist.jpg")
 
     assert result is None
     assert "Unable to decode video frame" in caplog.text
@@ -57,4 +55,3 @@ def test_processing_exception_is_handled_and_logged(caplog, monkeypatch):
 
     assert result is None
     assert "MediaPipe face detection failed" in caplog.text
-       
