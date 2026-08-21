@@ -287,17 +287,7 @@ services:
     networks:
       - ai-interview-network
     healthcheck:
-
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:14269/"]
-
-        [
-          "CMD",
-          "wget",
-          "--spider",
-          "-q",
-          "http://localhost:16686/"
-        ]
-
       interval: 15s
       timeout: 5s
       start_period: 30s
@@ -367,19 +357,7 @@ services:
       - "0.0.0.0"
     restart: unless-stopped
     healthcheck:
-
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/"]
-      interval: 15s
-      timeout: 5s
-      start_period: 15s
-
-      test:
-        [
-          "CMD",
-          "curl",
-          "-fsS",
-          "http://localhost:8080/"
-        ]
       interval: 30s
       timeout: 5s
       start_period: 30s
