@@ -312,9 +312,7 @@ def create_schedule_routes() -> APIRouter:
         """
         try:
             schedule = db.execute(
-                select(InterviewSchedule).where(
-                    InterviewSchedule.id == schedule_id
-                )
+                select(InterviewSchedule).where(InterviewSchedule.id == schedule_id)
             ).scalar_one_or_none()
 
             if not schedule:

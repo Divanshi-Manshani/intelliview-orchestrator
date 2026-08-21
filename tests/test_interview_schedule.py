@@ -92,11 +92,7 @@ def test_interview_schedule_orm_model(db_session):
     db_session.add(schedule)
     db_session.commit()
 
-    fetched = (
-        db_session.query(InterviewSchedule)
-        .filter_by(id="sched_101")
-        .first()
-    )
+    fetched = db_session.query(InterviewSchedule).filter_by(id="sched_101").first()
 
     assert fetched is not None
     assert fetched.candidate_id == "cand_test_101"
@@ -162,9 +158,7 @@ def test_create_schedule_api_endpoint(client, db_session):
     db_session.add(candidate)
     db_session.commit()
 
-    tomorrow = (
-        datetime.now(timezone.utc) + timedelta(days=1)
-    ).isoformat()
+    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
 
     payload = {
         "candidate_id": "cand_test_303",
@@ -210,9 +204,7 @@ def test_create_schedule_past_date_fails(client, db_session):
     db_session.add(candidate)
     db_session.commit()
 
-    yesterday = (
-        datetime.now(timezone.utc) - timedelta(days=1)
-    ).isoformat()
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
 
     payload = {
         "candidate_id": "cand_test_past",
@@ -296,10 +288,7 @@ def test_list_and_upcoming_schedule_api(client, db_session):
     schedules = res_list.json()["schedules"]
 
     assert len(schedules) >= 1
-    assert any(
-        schedule_data["id"] == "sched_future"
-        for schedule_data in schedules
-    )
+    assert any(schedule_data["id"] == "sched_future" for schedule_data in schedules)
 
     # GET /api/schedule/upcoming
     res_upcoming = client.get("/api/schedule/upcoming")
@@ -328,9 +317,7 @@ def test_full_end_to_end_schedule_flow(client, db_session):
     db_session.add(candidate)
     db_session.commit()
 
-    tomorrow = (
-        datetime.now(timezone.utc) + timedelta(days=1)
-    ).isoformat()
+    tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
 
     # 1. Schedule Interview via POST /api/schedule
     with patch("smtplib.SMTP") as mock_smtp:
@@ -354,11 +341,7 @@ def test_full_end_to_end_schedule_flow(client, db_session):
     sched_id = res_data["schedule"]["id"]
 
     # 2. Verify Saved in DB
-    db_entry = (
-        db_session.query(InterviewSchedule)
-        .filter_by(id=sched_id)
-        .first()
-    )
+    db_entry = db_session.query(InterviewSchedule).filter_by(id=sched_id).first()
 
     assert db_entry is not None
     assert db_entry.candidate_id == "cand_e2e_999"
@@ -375,10 +358,7 @@ def test_full_end_to_end_schedule_flow(client, db_session):
 
     upcoming_list = upcoming_res.json()["upcoming"]
 
-    assert any(
-        schedule_data["id"] == sched_id
-        for schedule_data in upcoming_list
-    )
+    assert any(schedule_data["id"] == sched_id for schedule_data in upcoming_list)
 
 
 # ---------------------------------------------------------------------------
