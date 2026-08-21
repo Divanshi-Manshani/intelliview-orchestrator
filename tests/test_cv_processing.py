@@ -1,5 +1,5 @@
-from cv_service.processing import detect_faces_in_frame
 from cv_service import processing
+from cv_service.processing import detect_faces_in_frame
 
 
 def test_garbled_frame_is_handled_and_logged(caplog, monkeypatch):
