@@ -30,10 +30,10 @@ test_unit_session_manager.py.
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
+
 from prometheus_client import generate_latest
 
 from monitoring.prometheus_metrics import registry
-
 from workers import tasks
 
 
@@ -227,6 +227,7 @@ def test_average_evaluation_latency_running_average():
 
 def test_average_evaluation_latency_exposed_through_metrics_endpoint():
     from fastapi.testclient import TestClient
+
     from orchestrator import main
 
     with (

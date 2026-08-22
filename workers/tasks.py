@@ -22,9 +22,9 @@ from sqlalchemy import select
 from database.db import SessionLocal
 from database.models import InterviewSession
 from monitoring.prometheus_metrics import (
+    AVG_EVALUATION_LATENCY,
     FAILURE_COUNT,
     PIPELINE_LATENCY,
-    AVG_EVALUATION_LATENCY,
     POSTGRES_HEALTH,
     REDIS_HEALTH,
     RISK_SCORE,
