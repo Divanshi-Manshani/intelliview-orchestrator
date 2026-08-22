@@ -39,6 +39,9 @@ from workers.risk_engine import RiskScoringEngine
 
 logger = logging.getLogger(__name__)
 
+evaluation_latency_total = 0.0
+evaluation_latency_count = 0
+
 session_manager = SessionManager()
 state_sync = StateSynchronizer()
 
