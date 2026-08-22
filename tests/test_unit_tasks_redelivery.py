@@ -124,10 +124,13 @@ def test_fresh_queued_session_dispatches_normally():
     fake_chord_obj.assert_called_once()
     assert result["status"] == "processing_parallel"
 
+
 def test_average_evaluation_latency_metric_exists():
     metrics = generate_latest(registry).decode()
 
     assert "intelliview_avg_evaluation_latency_seconds" in metrics
+
+
 def test_average_evaluation_latency_updates_after_evaluation():
     tasks.evaluation_latency_total = 0.0
     tasks.evaluation_latency_count = 0
@@ -171,6 +174,7 @@ def test_average_evaluation_latency_updates_after_evaluation():
     assert tasks.evaluation_latency_count == 1
     assert tasks.evaluation_latency_total > 0
     assert tasks.AVG_EVALUATION_LATENCY._value.get() > 0
+
 
 def test_average_evaluation_latency_running_average():
     tasks.evaluation_latency_total = 0.0
@@ -216,31 +220,34 @@ def test_average_evaluation_latency_running_average():
 
     assert tasks.evaluation_latency_count == 2
 
-    expected_average = (
-        tasks.evaluation_latency_total / tasks.evaluation_latency_count
-    )
+    expected_average = tasks.evaluation_latency_total / tasks.evaluation_latency_count
 
     assert tasks.AVG_EVALUATION_LATENCY._value.get() == expected_average
+
 
 def test_average_evaluation_latency_exposed_through_metrics_endpoint():
     from fastapi.testclient import TestClient
     from orchestrator import main
 
-    with patch.object(
-        main.health_monitor,
-        "_check_all_dependencies",
-        return_value={
-            "redis": {"status": "healthy"},
-            "postgres": {"status": "healthy"},
-        },
-    ), patch.object(
-        main.worker_registry,
-        "get_all_workers",
-        return_value=[],
-    ), patch.object(
-        main.worker_registry,
-        "detect_unhealthy_workers",
-        return_value=[],
+    with (
+        patch.object(
+            main.health_monitor,
+            "_check_all_dependencies",
+            return_value={
+                "redis": {"status": "healthy"},
+                "postgres": {"status": "healthy"},
+            },
+        ),
+        patch.object(
+            main.worker_registry,
+            "get_all_workers",
+            return_value=[],
+        ),
+        patch.object(
+            main.worker_registry,
+            "detect_unhealthy_workers",
+            return_value=[],
+        ),
     ):
         response = TestClient(main.app).get("/metrics")
 
