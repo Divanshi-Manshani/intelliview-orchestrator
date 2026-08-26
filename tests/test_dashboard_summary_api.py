@@ -1,0 +1,160 @@
+"""
+Unit tests for the new dashboard summary endpoint on dashboard_api.py
+"""
+
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from database.db import Base, SessionLocal, engine
+from database.models import Candidate, InterviewSchedule, InterviewSession
+from monitoring.dashboard_api import create_dashboard_routes
+
+
+@pytest.fixture
+def mock_dependencies():
+    return {
+        "metrics_collector": MagicMock(),
+        "session_manager": MagicMock(),
+        "worker_registry": MagicMock(),
+        "session_tracker": MagicMock(),
+        "fault_manager": MagicMock(),
+        "retry_manager": MagicMock(),
+        "health_monitor": MagicMock(),
+        "ws_manager": MagicMock(),
+    }
+
+
+@pytest.fixture
+def client_with_routes(mock_dependencies):
+    app = FastAPI()
+    router = create_dashboard_routes(**mock_dependencies)
+    app.include_router(router, prefix="/monitoring")
+    return TestClient(app)
+
+
+def test_summary_endpoint_with_mocked_dependencies(
+    client_with_routes, mock_dependencies
+):
+    mock_dependencies["session_tracker"].get_session_statistics.return_value = {
+        "active_sessions": 5
+    }
+    mock_dependencies["worker_registry"].get_worker_statistics.return_value = {
+        "healthy_workers": 3
+    }
+
+    response = client_with_routes.get("/monitoring/metrics/summary")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "success"
+    assert data["active_sessions"] == 5
+    assert data["healthy_workers"] == 3
+    assert "todays_interviews" in data
+    assert "timestamp" in data
+    assert data["summary"]["active_sessions"] == 5
+    assert data["summary"]["healthy_workers"] == 3
+
+    response_alias = client_with_routes.get("/monitoring/summary")
+    assert response_alias.status_code == 200
+    alias_data = response_alias.json()
+    assert alias_data["status"] == "success"
+    assert alias_data["active_sessions"] == 5
+    assert alias_data["healthy_workers"] == 3
+
+
+def test_summary_endpoint_fallback_to_metrics_collector(mock_dependencies):
+    mock_dependencies["session_tracker"] = None
+    mock_dependencies["worker_registry"] = None
+    mock_dependencies["metrics_collector"].get_system_metrics.return_value = {
+        "session_metrics": {"active": 7},
+        "worker_metrics": {"healthy_workers": 4},
+    }
+
+    app = FastAPI()
+    router = create_dashboard_routes(**mock_dependencies)
+    app.include_router(router, prefix="/monitoring")
+    client = TestClient(app)
+
+    response = client.get("/monitoring/metrics/summary")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "success"
+    assert data["active_sessions"] == 7
+    assert data["healthy_workers"] == 4
+
+
+def test_summary_endpoint_db_integration():
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        cand_id = f"cand_test_summary_{int(now.timestamp())}"
+        cand = Candidate(
+            candidate_id=cand_id,
+            name="Test Candidate",
+            email=f"candapi_{int(now.timestamp())}@example.com",
+        )
+        db.add(cand)
+        db.flush()
+
+        sess_id = f"sess_test_summary_{int(now.timestamp())}"
+        sess = InterviewSession(
+            session_id=sess_id,
+            candidate_id=cand_id,
+            status="PROCESSING",
+            created_at=now,
+            start_time=now,
+        )
+        db.add(sess)
+
+        sched_id = f"sched_test_summary_{int(now.timestamp())}"
+        sched = InterviewSchedule(
+            id=sched_id,
+            candidate_id=cand_id,
+            interviewer_id="interviewer_1",
+            scheduled_at=now + timedelta(hours=1),
+            status="scheduled",
+        )
+        db.add(sched)
+        db.commit()
+
+        from monitoring.metrics_collector import MetricsCollector
+        from orchestrator.session_tracker import SessionTracker
+        from orchestrator.worker_registry import WorkerRegistry
+
+        tracker = SessionTracker()
+        registry = WorkerRegistry()
+        collector = MetricsCollector()
+
+        registry.register_worker("worker_test_1", capacity=4)
+
+        app = FastAPI()
+        router = create_dashboard_routes(
+            metrics_collector=collector,
+            session_manager=MagicMock(),
+            worker_registry=registry,
+            session_tracker=tracker,
+            fault_manager=MagicMock(),
+            retry_manager=MagicMock(),
+            health_monitor=MagicMock(),
+            ws_manager=MagicMock(),
+        )
+        app.include_router(router, prefix="/monitoring")
+        client = TestClient(app)
+
+        response = client.get("/monitoring/metrics/summary")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["status"] == "success"
+        assert data["active_sessions"] >= 1
+        assert data["healthy_workers"] >= 1
+        assert data["todays_interviews"] >= 1
+
+    finally:
+        db.close()
