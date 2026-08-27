@@ -12,6 +12,21 @@ from fastapi.testclient import TestClient
 from database.db import Base, SessionLocal, engine
 from database.models import Candidate, InterviewSchedule, InterviewSession
 from monitoring.dashboard_api import create_dashboard_routes
+from orchestrator import http_cache
+
+
+@pytest.fixture(autouse=True)
+def _clear_summary_cache():
+    """The /metrics/summary route is cached in Redis under a fixed key
+    (see orchestrator/http_cache.py), independent of which app/dependencies
+    produced the response. Without clearing it, a cache hit from an earlier
+    test can leak into a later test within the same TTL window and make
+    assertions fail against stale data. Invalidate before and after each
+    test so every test observes a fresh computation.
+    """
+    http_cache.invalidate("monitoring.metrics.summary")
+    yield
+    http_cache.invalidate("monitoring.metrics.summary")
 
 
 @pytest.fixture
