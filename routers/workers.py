@@ -135,20 +135,18 @@ def create_worker_routes(
                 active_tasks=request.active_tasks,
             )
 
-            WORKER_HEARTBEAT_AGE_SECONDS.labels(
-                worker_id=request.worker_id
-            ).set(0)
+            WORKER_HEARTBEAT_AGE_SECONDS.labels(worker_id=request.worker_id).set(0)
 
-            WORKER_ACTIVE_TASKS.labels(
-                worker_id=request.worker_id
-            ).set(request.active_tasks)
+            WORKER_ACTIVE_TASKS.labels(worker_id=request.worker_id).set(
+                request.active_tasks
+            )
 
             worker_status = worker_registry.get_worker(request.worker_id)
 
             if worker_status:
-                WORKER_CAPACITY.labels(
-                    worker_id=request.worker_id
-                ).set(worker_status.get("capacity", 0))
+                WORKER_CAPACITY.labels(worker_id=request.worker_id).set(
+                    worker_status.get("capacity", 0)
+                )
 
             # Invalidate the workers + load caches so the next dashboard poll
             # receives the latest worker state.
@@ -162,8 +160,7 @@ def create_worker_routes(
 
             health_status = (
                 "healthy"
-                if worker_status
-                and worker_status.get("health_status") == "healthy"
+                if worker_status and worker_status.get("health_status") == "healthy"
                 else "unknown"
             )
 
@@ -268,12 +265,8 @@ def create_worker_routes(
                         "active_tasks": worker_data.get("active_tasks", 0),
                         "available_capacity": worker_data.get("capacity", 0)
                         - worker_data.get("active_tasks", 0),
-                        "health_status": (
-                            "healthy" if is_healthy else "unhealthy"
-                        ),
-                        "last_heartbeat": worker_data.get(
-                            "last_heartbeat", None
-                        ),
+                        "health_status": ("healthy" if is_healthy else "unhealthy"),
+                        "last_heartbeat": worker_data.get("last_heartbeat", None),
                         "joined_at": worker_data.get("joined_at", None),
                     }
                 )
@@ -311,9 +304,7 @@ def create_worker_routes(
             total_active = stats.get("total_active_tasks", 0)
 
             utilization = (
-                (total_active / total_capacity * 100)
-                if total_capacity > 0
-                else 0
+                (total_active / total_capacity * 100) if total_capacity > 0 else 0
             )
 
             return {
@@ -321,9 +312,7 @@ def create_worker_routes(
                 "total_capacity": total_capacity,
                 "total_active_tasks": total_active,
                 "system_utilization_percent": round(utilization, 2),
-                "average_utilization_per_worker": stats.get(
-                    "average_active_tasks", 0
-                ),
+                "average_utilization_per_worker": stats.get("average_active_tasks", 0),
                 "min_worker_load": stats.get("min_active_tasks", 0),
                 "max_worker_load": stats.get("max_active_tasks", 0),
                 "idle_workers": stats.get("idle_workers", 0),
@@ -358,23 +347,13 @@ def create_worker_routes(
             load_status = load_balancer.get_load_status()
 
             return {
-                "current_strategy": load_status.get(
-                    "current_strategy", "unknown"
-                ),
-                "system_utilization_percent": load_status.get(
-                    "system_utilization", 0
-                ),
-                "available_workers": load_status.get(
-                    "total_workers", 0
-                ),
+                "current_strategy": load_status.get("current_strategy", "unknown"),
+                "system_utilization_percent": load_status.get("system_utilization", 0),
+                "available_workers": load_status.get("total_workers", 0),
                 "busy_workers": load_status.get("busy_workers", 0),
                 "idle_workers": load_status.get("idle_workers", 0),
-                "system_at_capacity": load_status.get(
-                    "system_at_capacity", False
-                ),
-                "system_overloaded": load_status.get(
-                    "system_overloaded", False
-                ),
+                "system_at_capacity": load_status.get("system_at_capacity", False),
+                "system_overloaded": load_status.get("system_overloaded", False),
                 "recommended_strategy": load_status.get(
                     "recommended_strategy",
                     "LEAST_LOADED",
@@ -491,9 +470,7 @@ def create_worker_routes(
 
             return {
                 "status": "success",
-                "message": (
-                    f"Worker {worker_id} gracefully deregistered"
-                ),
+                "message": (f"Worker {worker_id} gracefully deregistered"),
                 "worker_id": worker_id,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
