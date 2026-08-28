@@ -1,9 +1,6 @@
-import pytest
-
 from workers.scoring_models import (
     ExperimentalRiskModel,
     WeightedRiskModel,
-    calculate_score,
 )
 
 
