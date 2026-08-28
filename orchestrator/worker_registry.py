@@ -26,8 +26,8 @@ from metrics.prometheus_metrics import (
     WORKERS_REGISTERED,
     WORKERS_UNHEALTHY,
 )
-from orchestrator.redis_client import get_redis_client
 from monitoring.websocket_manager import ws_manager
+from orchestrator.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -369,7 +369,7 @@ def __init__(self):
 
                 if has_changed:
                     self._trigger_sync_broadcast(worker_id)
-                    asyncio.create_task(
+                    task = asyncio.create_task(
                         ws_manager.broadcast_worker_alert(
                             worker_id,
                             "status_change",
@@ -613,7 +613,7 @@ def __init__(self):
 
                     if worker.get("status") != "unhealthy":
                         worker["status"] = "unhealthy"
-                        asyncio.create_task(
+                        task = asyncio.create_task(
                             ws_manager.broadcast_worker_alert(
                                 worker_id,
                                 "unhealthy",

@@ -545,7 +545,6 @@ class TestDigestNotifications(unittest.TestCase):
 
         from models import (
             DigestFrequency,
-            DigestPayload,
             DigestRecipient,
             InterviewEvent,
         )
