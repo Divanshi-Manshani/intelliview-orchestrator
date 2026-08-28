@@ -141,6 +141,27 @@ WORKER_HEARTBEAT_AGE_SECONDS = Gauge(
     registry=registry,
 )
 
+WORKER_CPU_PCT = Gauge(
+    "intelliview_worker_cpu_pct",
+    "Self-reported CPU utilization percent per worker",
+    ["worker_id"],
+    registry=registry,
+)
+
+WORKER_MEMORY_PCT = Gauge(
+    "intelliview_worker_memory_pct",
+    "Self-reported memory utilization percent per worker",
+    ["worker_id"],
+    registry=registry,
+)
+
+WORKER_QUEUE_DEPTH = Gauge(
+    "intelliview_worker_queue_depth",
+    "Self-reported queue depth per worker",
+    ["worker_id"],
+    registry=registry,
+)
+
 # ---------------------------------------------------------------------------
 # AI pipeline latency metrics
 # ---------------------------------------------------------------------------

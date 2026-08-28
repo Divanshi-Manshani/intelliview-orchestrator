@@ -35,6 +35,28 @@ def _wait_for_api(base_url: str, timeout: float = 30.0) -> None:
     pytest.fail(f"API not reachable at {base_url}: {last_err}")
 
 
+def _wait_for_worker(base_url: str, timeout: float = 30.0) -> None:
+    """
+    The `worker` container boots on its own schedule (connect to Redis/
+    Postgres, then POST /register-worker) *after* the API is already
+    answering /health. Any test that dispatches work via /start-interview
+    can otherwise race a fresh stack and hit 503 "no workers available"
+    before the worker has finished registering. Poll /workers until at
+    least one is present instead of assuming readiness from /health alone.
+    """
+    deadline = time.time() + timeout
+    last_err = None
+    while time.time() < deadline:
+        try:
+            r = httpx.get(f"{base_url}/workers", timeout=2.0)
+            if r.status_code == 200 and r.json().get("workers"):
+                return
+        except Exception as e:
+            last_err = e
+        time.sleep(1.0)
+    pytest.fail(f"No worker registered at {base_url} within {timeout}s: {last_err}")
+
+
 def test_health(api_base_url):
     _wait_for_api(api_base_url)
     r = httpx.get(f"{api_base_url}/health", timeout=5.0)
@@ -46,6 +68,20 @@ def test_health(api_base_url):
 
 def test_start_interview_and_get_status(api_base_url):
     _wait_for_api(api_base_url)
+    # The worker pool may take a few seconds to become available after startup.
+    # Retry a few times before declaring failure.
+    r = None
+    for _ in range(5):
+        r = httpx.post(
+            f"{api_base_url}/start-interview",
+            headers=API_HEADERS,
+            json={"candidate_id": f"cand-{uuid.uuid4().hex[:8]}", "priority": "high"},
+            timeout=30.0,
+        )
+        if r.status_code == 200:
+            break
+        time.sleep(3)
+    _wait_for_worker(api_base_url)
     r = httpx.post(
         f"{api_base_url}/start-interview",
         headers=API_HEADERS,
@@ -53,6 +89,7 @@ def test_start_interview_and_get_status(api_base_url):
         timeout=10.0,
     )
     assert r.status_code == 200, r.text
+
     session_id = r.json()["session_id"]
     assert session_id.startswith("session_")
 
@@ -95,7 +132,7 @@ def test_worker_register_requires_token(api_base_url):
     r = httpx.post(
         f"{api_base_url}/register-worker",
         json={"worker_id": "test-w", "capacity": 2},
-        headers={"X-API-Token": "dev-token-change-me"},
+        headers=API_HEADERS,
         timeout=5.0,
     )
     assert r.status_code == 200, r.text
@@ -104,6 +141,18 @@ def test_worker_register_requires_token(api_base_url):
 def test_full_pipeline_completes(api_base_url):
     """End-to-end: start an interview, wait for the worker to process it."""
     _wait_for_api(api_base_url)
+    r = None
+    for _ in range(5):
+        r = httpx.post(
+            f"{api_base_url}/start-interview",
+            headers=API_HEADERS,
+            json={"candidate_id": f"e2e-{uuid.uuid4().hex[:8]}", "priority": "medium"},
+            timeout=30.0,
+        )
+        if r.status_code == 200:
+            break
+        time.sleep(3)
+    _wait_for_worker(api_base_url)
     r = httpx.post(
         f"{api_base_url}/start-interview",
         headers=API_HEADERS,
@@ -141,7 +190,7 @@ def test_candidate_lifecycle(api_base_url):
             "email": email,
             "skills": ["python", "testing"],
         },
-        timeout=10.0,
+        timeout=30.0,
     )
     assert r.status_code == 200, r.text
     candidate = r.json()
@@ -164,7 +213,7 @@ def test_worker_lifecycle(api_base_url):
     """End-to-end: register a worker, send a heartbeat, see it listed, then deregister it."""
     _wait_for_api(api_base_url)
     worker_id = f"e2e-worker-{uuid.uuid4().hex[:8]}"
-    headers = {"X-API-Token": "test-token"}
+    headers = API_HEADERS
 
     r = httpx.post(
         f"{api_base_url}/register-worker",

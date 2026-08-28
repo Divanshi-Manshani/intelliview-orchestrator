@@ -59,6 +59,48 @@ def test_sync_to_database_with_token():
     assert response.status_code == 200
 
 
+def test_risk_config_returns_live_values(monkeypatch):
+    monkeypatch.setenv("RISK_VIDEO_WEIGHT", "0.5")
+    monkeypatch.setenv("RISK_AUDIO_WEIGHT", "0.25")
+    monkeypatch.setenv("RISK_EVALUATION_WEIGHT", "0.25")
+
+    monkeypatch.setenv("RISK_LOW_RISK_THRESHOLD", "0.2")
+    monkeypatch.setenv("RISK_MEDIUM_RISK_THRESHOLD", "0.5")
+    monkeypatch.setenv("RISK_HIGH_RISK_THRESHOLD", "0.75")
+
+    response = client.get("/api/admin/risk-config")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["pipeline_weights"] == {
+        "video": 0.5,
+        "audio": 0.25,
+        "evaluation": 0.25,
+    }
+
+    assert data["thresholds"] == {
+        "low": 0.2,
+        "medium": 0.5,
+        "high": 0.75,
+    }
+
+    assert "multiple_persons" in data["video_factors"]
+    assert "phone_detected" in data["video_factors"]
+    assert "suspicious_head_movement" in data["video_factors"]
+    assert "no_face_detected" in data["video_factors"]
+
+    assert "background_voices" in data["audio_factors"]
+    assert "suspicious_pattern" in data["audio_factors"]
+    assert "no_transcription" in data["audio_factors"]
+
+    assert "low_quality_answers" in data["evaluation_factors"]
+    assert "low_accuracy" in data["evaluation_factors"]
+    assert "poor_communication" in data["evaluation_factors"]
+    assert "hallucination" in data["evaluation_factors"]
+
+
 @patch("orchestrator.http_cache.invalidate")
 @patch("orchestrator.main.scheduler.get_estimated_wait_time")
 @patch("orchestrator.main.scheduler.schedule_task")
