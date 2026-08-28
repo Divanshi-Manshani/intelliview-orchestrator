@@ -1,12 +1,6 @@
 import pytest
 
-dataset-validation
-from workers.scoring_models import (
-    calculate_score,
-)  # Replace with the actual function name in your codebase
-
-from workers.scoring_models import calculate_score  # Replace with the actual function name in your codebase
-Stabilized-version
+from workers.scoring_models import calculate_score
 
 
 def test_scoring_output_ranges():
