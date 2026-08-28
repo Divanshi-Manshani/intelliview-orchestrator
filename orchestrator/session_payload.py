@@ -17,8 +17,7 @@ def serialize_session_payload(
     """Serialize session metadata for Redis, compressing only large payloads."""
     # Place 2: Copy dictionary and insert the version field at top of function
     payload = dict(session_data)
-    if "version" not in payload:
-        payload["version"] = version
+    payload["version"] = version
 
     value = json.dumps(payload)
     raw = value.encode("utf-8")
