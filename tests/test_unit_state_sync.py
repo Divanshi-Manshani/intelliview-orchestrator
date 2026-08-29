@@ -11,6 +11,7 @@ from monitoring.metrics_collector import MetricsCollector
 from orchestrator import session_payload
 from orchestrator.fault_manager import FaultManager
 from orchestrator.session_payload import (
+     DEFAULT_PAYLOAD_VERSION,
     SESSION_COMPRESSED_PREFIX,
     SESSION_COMPRESSION_THRESHOLD_BYTES,
     deserialize_session_payload,
@@ -72,21 +73,30 @@ def test_small_session_payload_stays_plain_json():
 
     payload = serialize_session_payload(session_data)
 
-    assert payload == json.dumps(session_data)
+    expected_session_data = {
+    **session_data,
+    "version": DEFAULT_PAYLOAD_VERSION,
+}
+
+    assert payload == json.dumps(expected_session_data)
     assert not payload.startswith(SESSION_COMPRESSED_PREFIX)
-    assert deserialize_session_payload(payload) == session_data
+    assert deserialize_session_payload(payload) == expected_session_data
 
 
 def test_payload_at_compression_threshold_stays_plain_json(monkeypatch):
     session_data = {"session_id": "s1", "metadata": "x" * 128}
-    serialized_size = len(json.dumps(session_data).encode("utf-8"))
+    expected_session_data = {
+    **session_data,
+    "version": DEFAULT_PAYLOAD_VERSION,
+}
+    serialized_size = len(json.dumps(expected_session_data).encode("utf-8"))
     monkeypatch.setattr(
         session_payload, "SESSION_COMPRESSION_THRESHOLD_BYTES", serialized_size
     )
 
     payload = serialize_session_payload(session_data)
 
-    assert payload == json.dumps(session_data)
+    assert payload == json.dumps(expected_session_data)
     assert not payload.startswith(SESSION_COMPRESSED_PREFIX)
 
 
@@ -100,16 +110,23 @@ def test_large_session_payload_is_compressed_and_round_trips():
     }
 
     payload = serialize_session_payload(session_data)
+    expected_session_data = {
+    **session_data,
+    "version": DEFAULT_PAYLOAD_VERSION,
+}
 
     assert payload.startswith(SESSION_COMPRESSED_PREFIX)
-    assert deserialize_session_payload(payload) == session_data
-
+    assert deserialize_session_payload(payload) == expected_session_data
 
 def test_legacy_plain_json_bytes_still_deserialize():
     session_data = {"session_id": "legacy", "status": "CREATED"}
     payload = json.dumps(session_data).encode("utf-8")
+    expected_session_data = {
+    **session_data,
+    "version": DEFAULT_PAYLOAD_VERSION,
+}
 
-    assert deserialize_session_payload(payload) == session_data
+    assert deserialize_session_payload(payload) == expected_session_data
 
 
 def test_state_synchronizer_reads_legacy_plain_json_cache_entries():
@@ -117,10 +134,14 @@ def test_state_synchronizer_reads_legacy_plain_json_cache_entries():
     sync = StateSynchronizer.__new__(StateSynchronizer)
     sync.redis_client = redis
     session_data = {"session_id": "legacy", "status": "QUEUED"}
+    expected_session_data = {
+    **session_data,
+    "version": DEFAULT_PAYLOAD_VERSION,
+}
 
     redis.set("session:legacy", json.dumps(session_data), ex=sync.SESSION_TTL)
 
-    assert sync.get_session_state("legacy") == session_data
+    assert sync.get_session_state("legacy") == expected_session_data
 
 
 def test_state_synchronizer_uses_compressed_payloads_for_large_sessions():
@@ -133,13 +154,18 @@ def test_state_synchronizer_uses_compressed_payloads_for_large_sessions():
         "status": "PROCESSING",
         "metadata": {"blob": "x" * SESSION_COMPRESSION_THRESHOLD_BYTES},
     }
+   
 
     assert sync.set_session_state("s2", session_data) is True
 
     stored, ttl = redis.values["session:s2"]
     assert ttl == sync.SESSION_TTL
+    expected_session_data = {
+    **session_data,
+    "version": DEFAULT_PAYLOAD_VERSION,
+}
     assert stored.startswith(SESSION_COMPRESSED_PREFIX)
-    assert sync.get_session_state("s2") == session_data
+    assert sync.get_session_state("s2") == expected_session_data
     assert "s2" in redis.sets["active_sessions"]
 
 
