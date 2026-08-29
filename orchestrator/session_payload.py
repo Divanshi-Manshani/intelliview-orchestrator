@@ -7,11 +7,19 @@ from typing import Any
 
 SESSION_COMPRESSION_THRESHOLD_BYTES = 32 * 1024
 SESSION_COMPRESSED_PREFIX = "gzip:v1:"
+# Place 1: Define default version constant under the compression prefix constants
+DEFAULT_PAYLOAD_VERSION = "1.0"
 
 
-def serialize_session_payload(session_data: dict[str, Any]) -> str:
+def serialize_session_payload(
+    session_data: dict[str, Any], version: str = DEFAULT_PAYLOAD_VERSION
+) -> str:
     """Serialize session metadata for Redis, compressing only large payloads."""
-    value = json.dumps(session_data)
+    # Place 2: Copy dictionary and insert the version field at top of function
+    payload = dict(session_data)
+    payload["version"] = version
+
+    value = json.dumps(payload)
     raw = value.encode("utf-8")
 
     if len(raw) <= SESSION_COMPRESSION_THRESHOLD_BYTES:
@@ -32,4 +40,10 @@ def deserialize_session_payload(value: str | bytes) -> dict[str, Any]:
         compressed = base64.b64decode(encoded.encode("ascii"), validate=True)
         value = gzip.decompress(compressed).decode("utf-8")
 
-    return json.loads(value)
+    data = json.loads(value)
+
+    # Place 3: Attach default version to legacy payloads before returning
+    if isinstance(data, dict) and "version" not in data:
+        data["version"] = DEFAULT_PAYLOAD_VERSION
+
+    return data
