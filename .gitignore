@@ -13,12 +13,10 @@ __pycache__/
 
 # Local caches
 .cache/
-
-# Local dev artifacts
-intelliview.db
-.coverage
-htmlcov/
-
 frontend/node_modules/
 frontend/.next/
+
+# Databases
 *.db
+#test
+.coverage

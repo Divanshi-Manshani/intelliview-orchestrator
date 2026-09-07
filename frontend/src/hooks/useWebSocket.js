@@ -52,6 +52,7 @@ export function useWebSocket({ path, onMessage, enabled = true }) {
 
     function connect() {
       if (cancelled) return;
+
       try {
         const ws = new WebSocket(api.wsUrl(path));
         wsRef.current = ws;
@@ -61,14 +62,31 @@ export function useWebSocket({ path, onMessage, enabled = true }) {
             ws.close();
             return;
           }
-          setConnected(true);
-          retryRef.current = 0;
+
+          const token = api.token;
+
+          if (!token) {
+            ws.close(1008, "missing token");
+            return;
+          }
+
+          ws.send(JSON.stringify({
+            type: "auth",
+            token,
+          }));
         };
 
         ws.onmessage = (event) => {
           if (cancelled) return;
+
           try {
             const data = JSON.parse(event.data);
+
+            if (data?.type === "hello") {
+              setConnected(true);
+              retryRef.current = 0;
+            }
+
             setLastMessage(data);
             onMessageRef.current?.(data);
           } catch {
@@ -93,10 +111,17 @@ export function useWebSocket({ path, onMessage, enabled = true }) {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+
       const ws = wsRef.current;
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+
+      if (
+        ws &&
+        (ws.readyState === WebSocket.OPEN ||
+          ws.readyState === WebSocket.CONNECTING)
+      ) {
         ws.close();
       }
+
       wsRef.current = null;
     };
   }, [path, enabled, reconnectCount]);
@@ -104,7 +129,10 @@ export function useWebSocket({ path, onMessage, enabled = true }) {
   return { connected, lastMessage, send, disconnect, reconnect };
 }
 
-export function useRealtimeSubscription(path, { enabled = true, onEvent } = {}) {
+export function useRealtimeSubscription(
+  path,
+  { enabled = true, onEvent } = {},
+) {
   const [events, setEvents] = useState([]);
   const [isLive, setIsLive] = useState(false);
   const maxEvents = 100;
@@ -121,7 +149,11 @@ export function useRealtimeSubscription(path, { enabled = true, onEvent } = {}) 
     [onEvent],
   );
 
-  const { connected } = useWebSocket({ path, onMessage: handleMessage, enabled });
+  const { connected } = useWebSocket({
+    path,
+    onMessage: handleMessage,
+    enabled,
+  });
 
   const clearEvents = useCallback(() => setEvents([]), []);
 

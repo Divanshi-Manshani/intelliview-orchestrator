@@ -91,9 +91,17 @@ from orchestrator.state_sync import StateSynchronizer
 from orchestrator.worker_registry import WorkerRegistry
 from routers.ab_testing import create_ab_testing_routes
 from routers.candidates import create_candidate_routes
+from routers.integrity import router as integrity_router
 from routers.practice_sessions import router as practice_sessions_router
 from routers.questions import create_question_routes
 from routers.schedule import create_schedule_routes
+from routers.session_control import (
+    MAX_RETRIES,
+    consume_retry,
+    create_session_control_router,
+    get_retry_count,
+    has_pending_retry,
+)
 from routers.sessions import (  # noqa: F401 (re-exported for tests)
     StartInterviewRequest,
     create_session_routes,
@@ -641,7 +649,10 @@ async def get_dependency_statuses():
     return await health_monitor._check_all_dependencies()
 
 
-@app.get("/admin/fairness-audit", dependencies=[Depends(require_token)])
+@app.get(
+    "/admin/fairness-audit",
+    dependencies=[Depends(require_role("admin"))],
+)
 async def get_fairness_audit_report():
     """Return a lightweight fairness audit report for recent scoring patterns.
 
@@ -759,6 +770,44 @@ async def start_interview(
         }
         priority = priority_map.get(request.priority.lower(), TaskPriority.MEDIUM)
 
+        # Enforce the Issue #72 retry limit per candidate and role.
+        position = (request.position or "").strip()
+
+        if position:
+            retry_redis = get_redis_client()
+
+            retry_count = get_retry_count(
+                retry_redis,
+                request.candidate_id,
+                position,
+            )
+
+            retry_pending = has_pending_retry(
+                retry_redis,
+                request.candidate_id,
+                position,
+            )
+
+            if retry_pending:
+                if retry_count >= MAX_RETRIES:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Retry limit reached for candidate "
+                            f"'{request.candidate_id}' and role '{position}'. "
+                            f"Maximum retries allowed: {MAX_RETRIES}."
+                        ),
+                    )
+
+                if not consume_retry(
+                    retry_redis,
+                    request.candidate_id,
+                    position,
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Retry could not be started.",
+                    )
         # Create session
         session_id = session_manager.create_session(
             candidate_id=request.candidate_id,
@@ -820,7 +869,8 @@ async def start_interview(
             risk_score=None,
             estimated_wait_time=wait_time if wait_time >= 0 else None,
         )
-
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error starting interview session: {e!s}")
         raise HTTPException(status_code=500, detail=f"Error starting interview: {e!s}")
@@ -1088,6 +1138,7 @@ def _build_risk_report_pdf(report: dict) -> Response:
 
 app.include_router(create_candidate_routes(candidate_manager=candidate_manager))
 app.include_router(practice_sessions_router)
+app.include_router(integrity_router)
 app.include_router(create_schedule_routes())
 app.include_router(create_question_routes(question_bank=question_bank))
 app.include_router(create_settings_routes())
@@ -1108,6 +1159,12 @@ app.include_router(
 app.include_router(
     create_ab_testing_routes(
         ab_testing_framework=ab_testing_framework,
+    )
+)
+app.include_router(
+    create_session_control_router(
+        session_manager=session_manager,
+        redis_client=get_redis_client(),
     )
 )
 
