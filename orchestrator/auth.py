@@ -36,6 +36,7 @@ def require_token(x_api_token: str | None = Header(default=None)) -> None:
             detail="invalid or missing API token",
         )
 
+
 def create_access_token(data: dict) -> str:
     """
     Generate a signed JWT access token.

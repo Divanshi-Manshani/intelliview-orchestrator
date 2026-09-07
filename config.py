@@ -210,6 +210,7 @@ def get_settings() -> Settings:
     """Cached settings accessor (per-process)."""
     return Settings()
 
+
 # Module-level aliases for backwards compatibility with imports like
 # `from config import REDIS_URL`. New code should use `get_settings()`.
 settings = get_settings()
