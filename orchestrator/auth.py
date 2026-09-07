@@ -2,7 +2,6 @@
 
 import hmac
 import logging
-import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Header, HTTPException
