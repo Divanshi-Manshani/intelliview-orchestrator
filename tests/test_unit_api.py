@@ -174,9 +174,7 @@ def test_fairness_audit_allows_admin():
     }
 
     try:
-        with patch(
-            "orchestrator.main.BiasAuditor"
-        ) as mock_bias_auditor:
+        with patch("orchestrator.main.BiasAuditor") as mock_bias_auditor:
             mock_bias_auditor.return_value.analyze_scoring_consistency.return_value = {}
 
             response = client.get("/admin/fairness-audit")

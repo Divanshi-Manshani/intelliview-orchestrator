@@ -640,6 +640,7 @@ async def get_dependency_statuses():
     """Deep health check of all dependencies (Redis, Postgres, Celery broker)."""
     return await health_monitor._check_all_dependencies()
 
+
 @app.get(
     "/admin/fairness-audit",
     dependencies=[Depends(require_role("admin"))],
