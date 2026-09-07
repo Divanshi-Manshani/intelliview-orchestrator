@@ -17,8 +17,8 @@ with (
     from orchestrator.main import app
 
 from database.db import Base, get_db
-from orchestrator.security import get_current_user
 from database.models import Candidate, InterviewSchedule
+from orchestrator.security import get_current_user
 from routers.schedule import create_schedule_routes
 
 client = TestClient(app)

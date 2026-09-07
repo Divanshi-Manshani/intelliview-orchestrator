@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from database.db import get_db
 from database.models.system_settings import SystemSettings
-from workers.risk_engine import RiskScoringEngine
 from orchestrator.security import require_role
+from workers.risk_engine import RiskScoringEngine
 
 logger = logging.getLogger(__name__)
 
