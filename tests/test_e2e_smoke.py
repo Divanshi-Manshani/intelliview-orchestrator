@@ -4,7 +4,7 @@ End-to-end smoke tests against a running stack.
 Run the stack first:
     docker compose up -d
     pip install -r requirements.txt
-    python -m pytest tests/test_e2e_smoke.py -v -m e2e
+    pytest tests/test_e2e_smoke.py -v
 
 Set API_BASE_URL to override the default http://localhost:8000.
 """
