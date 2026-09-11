@@ -8,10 +8,14 @@ from celery import Celery, signals
 from kombu import Queue
 from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
-from config import REDIS_URL
+from config import REDIS_URL, settings
 from metrics.prometheus_metrics import TASKS_PERMANENTLY_FAILED
 
-celery_app = Celery("interview_tasks", broker=REDIS_URL, backend=REDIS_URL)
+celery_app = Celery(
+    "interview_tasks",
+    broker=settings.celery_broker_url or REDIS_URL,
+    backend=settings.celery_result_backend or REDIS_URL,
+)
 EVALUATION_MAX_RETRIES = 3
 EVALUATION_RETRY_BACKOFF_BASE = 2
 EVALUATION_RETRY_BACKOFF_MAX = 60
